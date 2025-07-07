@@ -1,62 +1,59 @@
 // ===================================================================
-// PART 1: Define the converter (place this at the top of your file)
+// PART 1: Create a PROMISE that will resolve with the ready converter
+// This should be at the top of your js/search.js file.
 // ===================================================================
-const converter = OpenCC.Converter({ from: 'tw', to: 'cn' });
+const converterPromise = OpenCC.Converter({ from: 'tw', to: 'cn' });
 
 
 // ===================================================================
-// PART 2: Your main search function (This is where the magic happens)
+// PART 2: Your main search function, now corrected to WAIT for the converter
+// This function will be called by your search button.
 // ===================================================================
-// This is the function called by your search button's `onclick="search()"`
 async function search() {
-    const searchInput = document.getElementById('searchInput');
-    const originalQuery = searchInput.value.trim();
+    try {
+        // ui.showLoading(); // Show a loading spinner immediately if you have one
 
-    if (!originalQuery) {
-        showToast('請輸入搜索內容'); // Assuming you have a showToast function
-        return;
+        // STEP 1: Wait for the converter to finish loading its dictionaries.
+        const converter = await converterPromise;
+
+        const searchInput = document.getElementById('searchInput');
+        const originalQuery = searchInput.value.trim();
+
+        if (!originalQuery) {
+            showToast('請輸入搜索內容');
+            // ui.hideLoading();
+            return;
+        }
+
+        // STEP 2: Now it's safe to convert the text.
+        const simplifiedQuery = converter(originalQuery);
+        console.log(`Original: ${originalQuery}, Simplified: ${simplifiedQuery}`);
+
+        // STEP 3: Pass the simplified query to your API functions.
+        // ui.clearResults(); // Clear previous results
+        const allResults = await searchAllApis(simplifiedQuery);
+        // ui.displayResults(allResults); // Display new results
+
+    } catch (error) {
+        // This will catch any error during conversion or searching.
+        console.error("An error occurred during the search process:", error);
+        showToast("搜索失敗，請檢查瀏覽器控制台獲取更多信息。");
+    } finally {
+        // ui.hideLoading(); // Always hide the loading spinner at the end
     }
-
-    // STEP 1: Convert the user's text to Simplified Chinese here.
-    const simplifiedQuery = converter(originalQuery);
-
-    console.log(`Original Text: ${originalQuery}`);
-    console.log(`Converted to Simplified for API search: ${simplifiedQuery}`);
-
-    // STEP 2: Now, call your main logic with the *simplified* query.
-    // I am assuming you have a function that gets all selected APIs and then calls `searchByAPIAndKeyWord`.
-    // Let's call it `searchAllApis`.
-    
-    // Show loading spinner, clear old results etc.
-    ui.showLoading(); 
-    ui.clearResults();
-
-    // Pass the CONVERTED text to your search logic.
-    const allResults = await searchAllApis(simplifiedQuery);
-
-    // Display the final results on the page.
-    ui.displayResults(allResults);
-    ui.hideLoading();
 }
 
 /**
- * This function loops through selected APIs and calls your search function.
- * It receives the ALREADY CONVERTED query.
+ * This function receives the ALREADY CONVERTED query and calls your other function.
+ * This part is likely correct already.
  */
-async function searchAllApis(query) { // Note: `query` is already simplified here.
-    // Get the list of enabled API IDs from your settings/checkboxes
-    const selectedApiIds = getSelectedApiIds(); // You should already have a function for this
-
-    const searchPromises = selectedApiIds.map(apiId => 
-        // Pass the simplified query down to your function.
-        searchByAPIAndKeyWord(apiId, query)
-    );
-
+async function searchAllApis(query) {
+    const selectedApiIds = getSelectedApiIds(); // Assuming you have this function
+    const searchPromises = selectedApiIds.map(apiId => searchByAPIAndKeyWord(apiId, query));
     const resultsFromAllApis = await Promise.all(searchPromises);
-    
-    // Flatten the array of arrays into a single array of results
     return resultsFromAllApis.flat();
 }
+
 
 
 // ===================================================================
